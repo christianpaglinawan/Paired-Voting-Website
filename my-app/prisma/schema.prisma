@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Facilitator {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+}
+
+model Session {
+  id           String      @id @default(uuid())
+  passcode     String      @unique
+  status       String      @default("waiting") // waiting, importance, performance, completed
+  createdAt    DateTime    @default(now())
+  facilitator  Facilitator @relation(fields: [facilitatorId], references: [id], onDelete: Cascade)
+  facilitatorId String
+  
+  strategies   Strategy[]
+  votes        Vote[]
+}
+
+model Strategy {
+  id               String   @id @default(uuid())
+  text             String
+  order            Int      @default(0)
+  importanceScore  Float    @default(0)
+  performanceScore Float    @default(0)
+  
+  session          Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId        String
+}
+
+model Vote {
+  id             String   @id @default(uuid())
+  participantId  String
+  type           String   // importance or performance
+  data           String   // JSON payload representing the vote calculation
+  createdAt      DateTime @default(now())
+  
+  session        Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId      String
+}
