@@ -13,6 +13,9 @@ import {
     Title,
 } from 'chart.js';
 import { Scatter } from 'react-chartjs-2';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import * as XLSX from 'xlsx';
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend, Title);
 
@@ -114,14 +117,48 @@ export default function ResultsView() {
         },
     };
 
-    const handleExportPDF = () => {
-        // In a full implementation, use html2canvas + jspdf
-        alert('PDF Export functionality would trigger here.');
+    const handleExportPDF = async () => {
+        if (!chartRef.current) return;
+
+        // Capture the chart area
+        const chartElement = document.getElementById('results-chart-container');
+        if (!chartElement) return;
+
+        try {
+            const canvas = await html2canvas(chartElement);
+            const imgData = canvas.toDataURL('image/png');
+
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`Paired_Voting_Results_${sessionId}.pdf`);
+        } catch (err) {
+            console.error('Failed to export PDF', err);
+            alert('Failed to generate PDF.');
+        }
     };
 
     const handleExportExcel = () => {
-        // In a full implementation, use xlsx
-        alert('Excel Export functionality would trigger here.');
+        if (results.length === 0) return;
+
+        // Format the data for Excel
+        const worksheetData = results.map(r => ({
+            'Strategy ID': r.id,
+            'Strategy': r.text,
+            'Importance Score': r.importance,
+            'Performance Score (1-5)': r.performance
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Session Results");
+
+        // Download the Excel file
+        XLSX.writeFile(workbook, `Paired_Voting_Results_${sessionId}.xlsx`);
     };
 
     return (
@@ -152,7 +189,7 @@ export default function ResultsView() {
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="h-[600px] w-full relative">
+                    <div id="results-chart-container" className="h-[600px] w-full relative">
                         <Scatter ref={chartRef} data={chartData} options={options} />
 
                         {/* Quadrant Labels */}

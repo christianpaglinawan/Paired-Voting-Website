@@ -23,17 +23,14 @@ export default function FacilitatorLiveMonitor() {
     useEffect(() => {
         const fetchSession = async () => {
             try {
-                const res = await fetch(`/api/sessions/${id}/admin-control`);
-                // We will need to create this admin-control API to fetch the session securely.
-                // For now, let's assume it returns { session, strategies }
-
-                // Wait, standard fetch might not work without the API. 
-                // I should just use the socket to sync the state instead, or a dedicated API.
+                const res = await fetch(`/api/sessions/${id}/strategies`);
+                const data = await res.json();
+                if (data.strategies) setStrategies(data.strategies);
             } catch (err) {
-                // setError('Failed to load session');
+                console.error(err);
             }
         };
-        // fetchSession();
+        fetchSession();
     }, [id]);
 
     // Connect WebSocket
@@ -61,19 +58,22 @@ export default function FacilitatorLiveMonitor() {
         };
     }, [id]);
 
-    const advanceState = () => {
-        let nextState = roomState;
-        if (roomState === 'waiting') nextState = 'importance';
-        else if (roomState === 'importance') nextState = 'performance';
-        else if (roomState === 'performance') nextState = 'completed';
-
-        if (nextState === 'completed') {
-            router.push(`/results/${id}`);
-            return;
-        }
-
+    const startPhase = (nextState: string) => {
         if (socket) {
             socket.emit('set_room_state', { sessionId: id, state: nextState, questionIndex: 0 });
+        }
+    };
+
+    const nextQuestion = () => {
+        if (socket) {
+            socket.emit('set_room_state', { sessionId: id, state: roomState, questionIndex: questionIndex + 1 });
+        }
+    };
+
+    const finishSession = () => {
+        if (socket) {
+            socket.emit('set_room_state', { sessionId: id, state: 'completed', questionIndex: 0 });
+            router.push(`/results/${id}`);
         }
     };
 
@@ -123,29 +123,50 @@ export default function FacilitatorLiveMonitor() {
                             </span>
                         </div>
 
-                        <button
-                            onClick={advanceState}
-                            className="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-xl text-lg font-bold shadow-md transition-colors"
-                        >
-                            {roomState === 'waiting' && (
-                                <>
-                                    <span>Start Importance Voting</span>
-                                    <Play className="w-5 h-5 ml-1" />
-                                </>
-                            )}
-                            {roomState === 'importance' && (
-                                <>
-                                    <span>Move to Performance Voting</span>
-                                    <Play className="w-5 h-5 ml-1" />
-                                </>
-                            )}
-                            {roomState === 'performance' && (
-                                <>
-                                    <span>End Voting & View Results</span>
-                                    <CheckCircle className="w-5 h-5 ml-1" />
-                                </>
-                            )}
-                        </button>
+                        {roomState === 'waiting' && (
+                            <button onClick={() => startPhase('importance')} className="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-xl text-lg font-bold shadow-md transition-colors">
+                                <span>Start Importance Voting</span>
+                                <Play className="w-5 h-5 ml-1" />
+                            </button>
+                        )}
+
+                        {roomState === 'importance' && (
+                            <div className="space-y-4">
+                                <div className="text-center font-medium text-gray-700 mb-2">
+                                    Round {questionIndex + 1} of {Math.max(1, strategies.length - 1)}
+                                </div>
+                                {questionIndex < strategies.length - 2 ? (
+                                    <button onClick={nextQuestion} className="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-xl text-lg font-bold shadow-md transition-colors">
+                                        <span>Next Matchup</span>
+                                        <Play className="w-5 h-5 ml-1" />
+                                    </button>
+                                ) : (
+                                    <button onClick={() => startPhase('performance')} className="w-full flex items-center justify-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-xl text-lg font-bold shadow-md transition-colors">
+                                        <span>Move to Performance Voting</span>
+                                        <Play className="w-5 h-5 ml-1" />
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {roomState === 'performance' && (
+                            <div className="space-y-4">
+                                <div className="text-center font-medium text-gray-700 mb-2">
+                                    Round {questionIndex + 1} of {Math.max(1, strategies.length)}
+                                </div>
+                                {questionIndex < strategies.length - 1 ? (
+                                    <button onClick={nextQuestion} className="w-full flex items-center justify-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-xl text-lg font-bold shadow-md transition-colors">
+                                        <span>Next Strategy</span>
+                                        <Play className="w-5 h-5 ml-1" />
+                                    </button>
+                                ) : (
+                                    <button onClick={finishSession} className="w-full flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white p-4 rounded-xl text-lg font-bold shadow-md transition-colors">
+                                        <span>End Voting & View Results</span>
+                                        <CheckCircle className="w-5 h-5 ml-1" />
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                 </div>

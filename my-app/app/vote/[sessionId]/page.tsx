@@ -13,12 +13,21 @@ export default function ParticipantVote() {
 
     const [hasVotedCurrent, setHasVotedCurrent] = useState(false);
 
-    // MOCK DATA for layout testing since we don't have the API fully wired for fetching strategies down to the client yet.
-    const mockStrategies = [
-        { id: '1', text: 'Strategy A: Reduce operational costs by 15%' },
-        { id: '2', text: 'Strategy B: Launch 3 new product features' },
-        { id: '3', text: 'Strategy C: Increase marketing spend by 10%' }
-    ];
+    const [strategies, setStrategies] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (!sessionId) return;
+        const fetchStrategies = async () => {
+            try {
+                const res = await fetch(`/api/sessions/${sessionId}/strategies`);
+                const data = await res.json();
+                if (data.strategies) setStrategies(data.strategies);
+            } catch (err) {
+                console.error('Failed to fetch strategies');
+            }
+        };
+        fetchStrategies();
+    }, [sessionId]);
 
     useEffect(() => {
         if (!sessionId) return;
@@ -44,8 +53,38 @@ export default function ParticipantVote() {
     const submitVote = async (choice: string | number) => {
         setHasVotedCurrent(true);
 
-        // In a real implementation: Make a POST request to /api/votes/importance or /api/votes/performance
-        // For now, we mock the submission to let the user see the "Waiting for others" screen
+        if (strategies.length < 2) return;
+
+        // Determine current pair or single strategy based on basic sequencing
+        const stratA = strategies[questionIndex % strategies.length];
+        const stratB = strategies[(questionIndex + 1) % strategies.length];
+
+        try {
+            if (roomState === 'importance') {
+                await fetch('/api/votes/importance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId,
+                        strategyA: stratA.id,
+                        strategyB: stratB.id,
+                        choice: choice // 'A', 'B', or 'Neutral'
+                    })
+                });
+            } else if (roomState === 'performance') {
+                await fetch('/api/votes/performance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId,
+                        strategyId: stratA.id,
+                        rating: choice // 1-5 rating
+                    })
+                });
+            }
+        } catch (err) {
+            console.error('Vote failed', err);
+        }
     };
 
     return (
@@ -89,13 +128,13 @@ export default function ParticipantVote() {
                         <div className="p-6 md:p-10 flex flex-col space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center flex-1">
                                 <div className="flex items-center justify-center p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl min-h-[160px] text-center">
-                                    <span className="text-lg font-medium text-gray-800">{mockStrategies[0].text}</span>
+                                    <span className="text-lg font-medium text-gray-800">{strategies.length > 0 ? strategies[questionIndex % strategies.length]?.text : 'Loading...'}</span>
                                 </div>
 
                                 <div className="hidden md:flex items-center justify-center text-gray-400 font-bold italic">VS</div>
 
                                 <div className="flex items-center justify-center p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl min-h-[160px] text-center">
-                                    <span className="text-lg font-medium text-gray-800">{mockStrategies[1].text}</span>
+                                    <span className="text-lg font-medium text-gray-800">{strategies.length > 1 ? strategies[(questionIndex + 1) % strategies.length]?.text : 'Loading...'}</span>
                                 </div>
                             </div>
 
@@ -126,7 +165,7 @@ export default function ParticipantVote() {
 
                         <div className="p-6 md:p-10 flex flex-col space-y-8">
                             <div className="flex items-center justify-center p-8 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl min-h-[160px] text-center">
-                                <span className="text-xl font-bold text-gray-900">{mockStrategies[0].text}</span>
+                                <span className="text-xl font-bold text-gray-900">{strategies.length > 0 ? strategies[questionIndex % strategies.length]?.text : 'Loading...'}</span>
                             </div>
 
                             <div className="flex flex-col space-y-4">

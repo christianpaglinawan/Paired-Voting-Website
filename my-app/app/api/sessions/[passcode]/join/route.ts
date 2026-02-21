@@ -4,21 +4,21 @@ import crypto from 'crypto';
 
 export async function POST(
     request: Request,
-    { params }: { params: { passcode: string } }
+    { params }: { params: Promise<{ passcode: string }> }
 ) {
     try {
+        const { passcode } = await params;
+
         const session = await prisma.session.findUnique({
-            where: { passcode: params.passcode.toUpperCase() }
+            where: { passcode: passcode.toUpperCase() }
         });
 
         if (!session) {
             return NextResponse.json({ error: 'Invalid passcode' }, { status: 401 });
         }
 
-        // Generate a temporary participant token natively
         const participantToken = crypto.randomUUID();
 
-        // Create a response and assign the token in an HTTP-only cookie
         const response = NextResponse.json({
             success: true,
             sessionId: session.id,
